@@ -1,0 +1,201 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  annotations:
+    pipelines.kubeflow.org/pipeline_spec: '{"name": "housepredictiondata-sjmq6"}'
+  generateName: housepredictiondata-sjmq6-
+spec:
+  arguments:
+    parameters: []
+  entrypoint: housepredictiondata-sjmq6
+  serviceAccountName: pipeline-runner
+  templates:
+  - dag:
+      tasks:
+      - arguments:
+          parameters:
+          - name: kale-marshal-volume-name
+            value: pred-pvc
+        name: prepdata
+        template: prepdata
+      - arguments:
+          parameters:
+          - name: kale-marshal-volume-name
+            value: pred-pvc
+        dependencies:
+        - prepdata
+        name: trainmodel
+        template: trainmodel
+    name: housepredictiondata-sjmq6
+  - container:
+      args: []
+      command:
+      - python3
+      - -u
+      - -c
+      - "def prepdata():\n\n    import os\n    import shutil\n    from kale.utils\
+        \ import pod_utils\n    from kale.marshal import resource_save as _kale_resource_save\n\
+        \    from kale.marshal import resource_load as _kale_resource_load\n\n   \
+        \ _kale_data_directory = \"/marshal\"\n\n    if not os.path.isdir(_kale_data_directory):\n\
+        \        os.makedirs(_kale_data_directory, exist_ok=True)\n\n    import pandas\
+        \ as pd\n    from sklearn import preprocessing\n    from sklearn.model_selection\
+        \ import train_test_split\n    from sklearn import preprocessing\n    from\
+        \ sklearn.model_selection import train_test_split\n    import tensorflow as\
+        \ tf\n\n    from tensorflow import keras\n    from keras.models import Sequential\n\
+        \    from keras.layers import Dense\n    import urllib\n\n    #path = \"data/\"\
+        \n    path = \"/home/jovyan/\"\n    #PREDICTION_LABEL = 'Survived'\n    url1\
+        \ = 'https://raw.githubusercontent.com/josephlee94/intuitive-deep-learning/master/Part%201%3A%20Predicting%20House%20Prices/housepricedata.csv'\n\
+        \    print(\"getting files\")\n    urllib.request.urlretrieve(url1, path +\
+        \ \"housepricedata.csv\")\n\n    print(\"reading files\")\n\n    df = pd.read_csv(path\
+        \ + \"housepricedata.csv\")\n    dataset = df.values\n    # Split data to\
+        \ features X and Lable Y. The Label is what we want to predict, is the house\
+        \ price above median price?\n    X = dataset[:, 0:10]\n    Y = dataset[:,\
+        \ 10]\n    # Scale the date between 0 and 1 to make it easier to train\n \
+        \   min_max_scaler = preprocessing.MinMaxScaler()\n    X_scale = min_max_scaler.fit_transform(X)\n\
+        \    # Split the data set for training and validating. For both features and\
+        \ input\n    X_train, X_val_and_test, Y_train, Y_val_and_test = train_test_split(\n\
+        \        X_scale, Y, test_size=0.3)\n    X_val, X_test, Y_val, Y_test = train_test_split(\n\
+        \        X_val_and_test, Y_val_and_test, test_size=0.5)\n\n    # -----------------------DATA\
+        \ SAVING START---------------------------------\n    if \"Y_test\" in locals():\n\
+        \        _kale_resource_save(Y_test, os.path.join(\n            _kale_data_directory,\
+        \ \"Y_test\"))\n    else:\n        print(\"_kale_resource_save: `Y_test` not\
+        \ found.\")\n    if \"X_val\" in locals():\n        _kale_resource_save(X_val,\
+        \ os.path.join(_kale_data_directory, \"X_val\"))\n    else:\n        print(\"\
+        _kale_resource_save: `X_val` not found.\")\n    if \"X_train\" in locals():\n\
+        \        _kale_resource_save(X_train, os.path.join(\n            _kale_data_directory,\
+        \ \"X_train\"))\n    else:\n        print(\"_kale_resource_save: `X_train`\
+        \ not found.\")\n    if \"X_test\" in locals():\n        _kale_resource_save(X_test,\
+        \ os.path.join(\n            _kale_data_directory, \"X_test\"))\n    else:\n\
+        \        print(\"_kale_resource_save: `X_test` not found.\")\n    if \"Y_val\"\
+        \ in locals():\n        _kale_resource_save(Y_val, os.path.join(_kale_data_directory,\
+        \ \"Y_val\"))\n    else:\n        print(\"_kale_resource_save: `Y_val` not\
+        \ found.\")\n    if \"Y_train\" in locals():\n        _kale_resource_save(Y_train,\
+        \ os.path.join(\n            _kale_data_directory, \"Y_train\"))\n    else:\n\
+        \        print(\"_kale_resource_save: `Y_train` not found.\")\n\nimport argparse\n\
+        _parser = argparse.ArgumentParser(prog='Prepdata', description='')\n_parsed_args\
+        \ = vars(_parser.parse_args())\n_output_files = _parsed_args.pop(\"_output_paths\"\
+        , [])\n\n_outputs = prepdata(**_parsed_args)\n\nif not hasattr(_outputs, '__getitem__')\
+        \ or isinstance(_outputs, str):\n    _outputs = [_outputs]\n\n_output_serializers\
+        \ = [\n\n]\n\nimport os\nfor idx, output_file in enumerate(_output_files):\n\
+        \    try:\n        os.makedirs(os.path.dirname(output_file))\n    except OSError:\n\
+        \        pass\n    with open(output_file, 'w') as f:\n        f.write(_output_serializers[idx](_outputs[idx]))\n"
+      image: gcr.io/arrikto-public/tensorflow-1.14.0-notebook-cpu:kubecon-workshop
+      securityContext:
+        runAsUser: 0
+      volumeMounts:
+      - mountPath: /marshal
+        name: kale-marshal-volume
+      workingDir: /home/jovyan/datanew/examples/titanic-ml-dataset
+    inputs:
+      parameters:
+      - name: kale-marshal-volume-name
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/component_spec: '{"inputs": [], "name": "Prepdata",
+          "outputs": []}'
+    name: prepdata
+    volumes:
+    - name: kale-marshal-volume
+      persistentVolumeClaim:
+        claimName: pred-pvc
+  - container:
+      args: []
+      command:
+      - python3
+      - -u
+      - -c
+      - "def trainmodel():\n\n    import os\n    import shutil\n    from kale.utils\
+        \ import pod_utils\n    from kale.marshal import resource_save as _kale_resource_save\n\
+        \    from kale.marshal import resource_load as _kale_resource_load\n\n   \
+        \ _kale_data_directory = \"/marshal\"\n\n    if not os.path.isdir(_kale_data_directory):\n\
+        \        os.makedirs(_kale_data_directory, exist_ok=True)\n\n    # -----------------------DATA\
+        \ LOADING START--------------------------------\n    _kale_directory_file_names\
+        \ = [\n        os.path.splitext(f)[0]\n        for f in os.listdir(_kale_data_directory)\n\
+        \        if os.path.isfile(os.path.join(_kale_data_directory, f))\n    ]\n\
+        \n    if \"Y_test\" not in _kale_directory_file_names:\n        raise ValueError(\"\
+        Y_test\" + \" does not exists in directory\")\n\n    _kale_load_file_name\
+        \ = [\n        f\n        for f in os.listdir(_kale_data_directory)\n    \
+        \    if os.path.isfile(os.path.join(_kale_data_directory, f)) and\n      \
+        \  os.path.splitext(f)[0] == \"Y_test\"\n    ]\n    if len(_kale_load_file_name)\
+        \ > 1:\n        raise ValueError(\"Found multiple files with name \" +\n \
+        \                        \"Y_test\" + \": \" + str(_kale_load_file_name))\n\
+        \    _kale_load_file_name = _kale_load_file_name[0]\n    Y_test = _kale_resource_load(os.path.join(\n\
+        \        _kale_data_directory, _kale_load_file_name))\n\n    if \"X_val\"\
+        \ not in _kale_directory_file_names:\n        raise ValueError(\"X_val\" +\
+        \ \" does not exists in directory\")\n\n    _kale_load_file_name = [\n   \
+        \     f\n        for f in os.listdir(_kale_data_directory)\n        if os.path.isfile(os.path.join(_kale_data_directory,\
+        \ f)) and\n        os.path.splitext(f)[0] == \"X_val\"\n    ]\n    if len(_kale_load_file_name)\
+        \ > 1:\n        raise ValueError(\"Found multiple files with name \" +\n \
+        \                        \"X_val\" + \": \" + str(_kale_load_file_name))\n\
+        \    _kale_load_file_name = _kale_load_file_name[0]\n    X_val = _kale_resource_load(os.path.join(\n\
+        \        _kale_data_directory, _kale_load_file_name))\n\n    if \"X_train\"\
+        \ not in _kale_directory_file_names:\n        raise ValueError(\"X_train\"\
+        \ + \" does not exists in directory\")\n\n    _kale_load_file_name = [\n \
+        \       f\n        for f in os.listdir(_kale_data_directory)\n        if os.path.isfile(os.path.join(_kale_data_directory,\
+        \ f)) and\n        os.path.splitext(f)[0] == \"X_train\"\n    ]\n    if len(_kale_load_file_name)\
+        \ > 1:\n        raise ValueError(\"Found multiple files with name \" +\n \
+        \                        \"X_train\" + \": \" + str(_kale_load_file_name))\n\
+        \    _kale_load_file_name = _kale_load_file_name[0]\n    X_train = _kale_resource_load(os.path.join(\n\
+        \        _kale_data_directory, _kale_load_file_name))\n\n    if \"X_test\"\
+        \ not in _kale_directory_file_names:\n        raise ValueError(\"X_test\"\
+        \ + \" does not exists in directory\")\n\n    _kale_load_file_name = [\n \
+        \       f\n        for f in os.listdir(_kale_data_directory)\n        if os.path.isfile(os.path.join(_kale_data_directory,\
+        \ f)) and\n        os.path.splitext(f)[0] == \"X_test\"\n    ]\n    if len(_kale_load_file_name)\
+        \ > 1:\n        raise ValueError(\"Found multiple files with name \" +\n \
+        \                        \"X_test\" + \": \" + str(_kale_load_file_name))\n\
+        \    _kale_load_file_name = _kale_load_file_name[0]\n    X_test = _kale_resource_load(os.path.join(\n\
+        \        _kale_data_directory, _kale_load_file_name))\n\n    if \"Y_train\"\
+        \ not in _kale_directory_file_names:\n        raise ValueError(\"Y_train\"\
+        \ + \" does not exists in directory\")\n\n    _kale_load_file_name = [\n \
+        \       f\n        for f in os.listdir(_kale_data_directory)\n        if os.path.isfile(os.path.join(_kale_data_directory,\
+        \ f)) and\n        os.path.splitext(f)[0] == \"Y_train\"\n    ]\n    if len(_kale_load_file_name)\
+        \ > 1:\n        raise ValueError(\"Found multiple files with name \" +\n \
+        \                        \"Y_train\" + \": \" + str(_kale_load_file_name))\n\
+        \    _kale_load_file_name = _kale_load_file_name[0]\n    Y_train = _kale_resource_load(os.path.join(\n\
+        \        _kale_data_directory, _kale_load_file_name))\n\n    if \"Y_val\"\
+        \ not in _kale_directory_file_names:\n        raise ValueError(\"Y_val\" +\
+        \ \" does not exists in directory\")\n\n    _kale_load_file_name = [\n   \
+        \     f\n        for f in os.listdir(_kale_data_directory)\n        if os.path.isfile(os.path.join(_kale_data_directory,\
+        \ f)) and\n        os.path.splitext(f)[0] == \"Y_val\"\n    ]\n    if len(_kale_load_file_name)\
+        \ > 1:\n        raise ValueError(\"Found multiple files with name \" +\n \
+        \                        \"Y_val\" + \": \" + str(_kale_load_file_name))\n\
+        \    _kale_load_file_name = _kale_load_file_name[0]\n    Y_val = _kale_resource_load(os.path.join(\n\
+        \        _kale_data_directory, _kale_load_file_name))\n    # -----------------------DATA\
+        \ LOADING END----------------------------------\n\n    import pandas as pd\n\
+        \    from sklearn import preprocessing\n    from sklearn.model_selection import\
+        \ train_test_split\n    from sklearn import preprocessing\n    from sklearn.model_selection\
+        \ import train_test_split\n    import tensorflow as tf\n\n    from tensorflow\
+        \ import keras\n    from keras.models import Sequential\n    from keras.layers\
+        \ import Dense\n    import urllib\n\n    model = Sequential([\n        Dense(32,\
+        \ activation='relu', input_shape=(10,)),\n        Dense(32, activation='relu'),\n\
+        \        Dense(1, activation='sigmoid'),\n    ])\n    model.compile(optimizer='sgd',\n\
+        \                  loss='binary_crossentropy',\n                  metrics=['accuracy'])\n\
+        \    hist = model.fit(X_train, Y_train,\n                     batch_size=32,\
+        \ epochs=100,\n                     validation_data=(X_val, Y_val))\n    model.evaluate(X_test,\
+        \ Y_test)[1]\n\nimport argparse\n_parser = argparse.ArgumentParser(prog='Trainmodel',\
+        \ description='')\n_parsed_args = vars(_parser.parse_args())\n_output_files\
+        \ = _parsed_args.pop(\"_output_paths\", [])\n\n_outputs = trainmodel(**_parsed_args)\n\
+        \nif not hasattr(_outputs, '__getitem__') or isinstance(_outputs, str):\n\
+        \    _outputs = [_outputs]\n\n_output_serializers = [\n\n]\n\nimport os\n\
+        for idx, output_file in enumerate(_output_files):\n    try:\n        os.makedirs(os.path.dirname(output_file))\n\
+        \    except OSError:\n        pass\n    with open(output_file, 'w') as f:\n\
+        \        f.write(_output_serializers[idx](_outputs[idx]))\n"
+      image: gcr.io/arrikto-public/tensorflow-1.14.0-notebook-cpu:kubecon-workshop
+      securityContext:
+        runAsUser: 0
+      volumeMounts:
+      - mountPath: /marshal
+        name: kale-marshal-volume
+      workingDir: /home/jovyan/datanew/examples/titanic-ml-dataset
+    inputs:
+      parameters:
+      - name: kale-marshal-volume-name
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/component_spec: '{"inputs": [], "name": "Trainmodel",
+          "outputs": []}'
+    name: trainmodel
+    volumes:
+    - name: kale-marshal-volume
+      persistentVolumeClaim:
+        claimName: pred-pvc
